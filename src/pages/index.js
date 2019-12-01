@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
-import { parseNumbersFromUrl, generateFiveGame } from './lotto.js'
+import { parseNumbersFromUrl, generateFiveGame } from '../components/lotto.js'
 import Scanner from '../components/Scanner.js'
 import Game from '../components/Game.js'
 
@@ -72,7 +72,7 @@ export default function App() {
           <Game key={index} numbers={numbers} />
         ))}
       </div>
-      <div>스캔된 QR코드 문자열: {decodedUrl}</div>
+      <div>스캔된 QR코드 문자열: <a href={decodedUrl}>{decodedUrl}</a></div>
       <div>에러 메시지: {errorMessage}</div>
     </StyledApp>
   )

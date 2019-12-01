@@ -1,5 +1,4 @@
-import React from "react"
-import QrReader from "react-qr-reader"
+import React, { useState, useEffect } from "react"
 import styled from "styled-components"
 
 const StyledScanner = styled.div`
@@ -23,16 +22,25 @@ const StyledButton = styled.button`
 `
 
 export default function Scanner({ show, scanInterval, onClickToggleButton, onError, onScan }) {
-  let scanner = <span>QR 코드 스캐너가 꺼져있습니다.</span>
-  if (show) {
-    scanner = (
-      <QrReader
-        delay={scanInterval}
-        onError={onError}
-        onScan={onScan}
-      />
-    )
-  }
+  let [scanner, setScanner] = useState(<span>QR 코드 스캐너가 꺼져있습니다.</span>)
+  useEffect(() => {
+    if (show) {
+      function loadScanner() {
+        const QrReader = require("react-qr-reader")
+        console.log(QrReader)
+        setScanner(
+          <QrReader
+            delay={scanInterval}
+            onError={onError}
+            onScan={onScan}
+          />
+        )  
+      }
+      loadScanner()
+    } else {
+      setScanner(<span>QR 코드 스캐너가 꺼져있습니다.</span>)
+    }
+  }, [show, scanInterval, onError, onScan])
 
   const toggleButtonLabel = show ? 'Off' : 'On'
   const toggleButton = <StyledButton onClick={onClickToggleButton}>{toggleButtonLabel}</StyledButton>
