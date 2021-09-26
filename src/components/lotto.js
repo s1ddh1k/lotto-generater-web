@@ -22,7 +22,7 @@ function generateOneNumber(excludedNumbers, selectedNumbers) {
   return generatedNumber
 }
 
-function generateOneGame(excludedNumbers) {
+export function generateOneGame(excludedNumbers = []) {
   const selectedNumbers = []
   for (let i = 0; i < 6; i++) {
     const selected = generateOneNumber(excludedNumbers, selectedNumbers)
@@ -50,7 +50,9 @@ export function parseNumbersFromUrl(url) {
   return result
 }
 
-export default {
+const exportedObject = {
   generateFiveGame,
   parseNumbersFromUrl,
 }
+
+export default exportedObject

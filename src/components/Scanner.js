@@ -3,7 +3,8 @@ import styled from "styled-components"
 
 const StyledScanner = styled.div`
   position: relative;
-  width: 400px;
+  width: 100%;
+  max-width: 400px;
   height: 400px;
   text-align: center;
   vertical-align: middle;
@@ -12,41 +13,50 @@ const StyledScanner = styled.div`
   border-width: 1px;
   border-color: black;
 `
-const StyledButton = styled.button`
+const ToggleButton = styled.button`
   position: absolute;
   right: 0;
   bottom: 0;
   width: 100px;
-  height: 20px;
-  z-index: 1;
+  z-index: 10;
 `
 
-export default function Scanner({ show, scanInterval, onClickToggleButton, onError, onScan }) {
-  let [scanner, setScanner] = useState(<span>QR 코드 스캐너가 꺼져있습니다.</span>)
+const GenerateButton = styled.button`
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100px;
+  z-index: 10;
+`
+
+export default function Scanner({ show, scanInterval, onClickToggleButton, onClickGenerateButton, onError, onScan }) {
+  let [scanner, setScanner] = useState(<div>QR 코드 스캐너가 꺼져있습니다.</div>)
   useEffect(() => {
     if (show) {
       function loadScanner() {
         const QrReader = require("react-qr-reader")
-        console.log(QrReader)
         setScanner(
           <QrReader
             delay={scanInterval}
             onError={onError}
             onScan={onScan}
           />
-        )  
+        )
       }
       loadScanner()
     } else {
-      setScanner(<span>QR 코드 스캐너가 꺼져있습니다.</span>)
+      setScanner(<div>QR 코드 스캐너가 꺼져있습니다.</div>)
     }
   }, [show, scanInterval, onError, onScan])
 
+  const generateButton = <GenerateButton onClick={onClickGenerateButton} className='absolute bottom-0 left-0 z-10'>그냥 생성하기</GenerateButton>
+
   const toggleButtonLabel = show ? 'Off' : 'On'
-  const toggleButton = <StyledButton onClick={onClickToggleButton}>{toggleButtonLabel}</StyledButton>
+  const toggleButton = <ToggleButton onClick={onClickToggleButton}>{toggleButtonLabel}</ToggleButton>
 
   return <StyledScanner>
     {scanner}
+    {generateButton}
     {toggleButton}
   </StyledScanner>
 }

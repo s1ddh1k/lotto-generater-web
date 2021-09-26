@@ -1,16 +1,14 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
-import { parseNumbersFromUrl, generateFiveGame } from '../components/lotto.js'
+import { parseNumbersFromUrl, generateOneGame, generateFiveGame } from '../components/lotto.js'
 import Scanner from '../components/Scanner.js'
 import Game from '../components/Game.js'
 
 const DH_LOTTERY_URL = 'http://m.dhlottery.co.kr'
 
-const StyledApp = styled.div`
-  display: grid;
-`
+const StyledApp = styled.div``
 
-function splitArrayChunk(array, chunkSize) {  
+function splitArrayChunk(array, chunkSize) {
   return Array(Math.ceil(array.length / chunkSize))
     .fill()
     .map((_, index) => index * chunkSize)
@@ -44,6 +42,11 @@ export default function App() {
     setGeneratedNumbers(generatedNumbers)
   }
 
+  const generateOneGameNumbers = () => {
+    const generatedNumbers = generateOneGame()
+    setGeneratedNumbers(generatedNumbers)
+  }
+
   const onError = error => {
     setErrorMessage(error.message)
   }
@@ -53,10 +56,11 @@ export default function App() {
   }
 
   return (
-    <StyledApp>
+    <StyledApp className='flex-1 w-full justify-center items-center'>
       <Scanner
         show={showScanner}
         onClickToggleButton={toggleShowScanner}
+        onClickGenerateButton={generateOneGameNumbers}
         onScan={onScan}
         onError={onError}
       />
