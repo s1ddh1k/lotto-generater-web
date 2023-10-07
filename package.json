@@ -16,7 +16,7 @@
     "autoprefixer": "^10.3.6",
     "gatsby": "^5.11.0",
     "gatsby-plugin-postcss": "^6.11.0",
-    "postcss": "^8.3.8",
+    "postcss": "^8.4.31",
     "react": "^16.12.0",
     "react-dom": "^16.12.0",
     "react-qr-reader": "^2.2.1",
