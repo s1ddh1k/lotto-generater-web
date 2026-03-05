@@ -1,36 +1,31 @@
 {
-  "name": "gatsby-starter-hello-world",
+  "name": "lotto-generater-web",
   "private": true,
-  "description": "A simplified bare-bones starter for Gatsby",
-  "version": "0.1.0",
-  "license": "MIT",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Lotto number generator for unlucky people",
   "scripts": {
-    "build": "gatsby build",
-    "develop": "gatsby develop",
-    "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
-    "start": "npm run develop",
-    "serve": "gatsby serve",
-    "test": "echo \"Write tests! -> https://gatsby.dev/unit-testing \""
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "autoprefixer": "^10.3.6",
-    "gatsby": "^5.11.0",
-    "gatsby-plugin-postcss": "^6.11.0",
-    "postcss": "^8.3.8",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0",
-    "react-qr-reader": "^2.2.1",
-    "styled-components": "^4.4.1",
-    "tailwindcss": "^2.2.15"
+    "@yudiel/react-qr-scanner": "^2.3.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "prettier": "^1.18.2"
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.8"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/gatsbyjs/gatsby-starter-hello-world"
-  },
-  "bugs": {
-    "url": "https://github.com/gatsbyjs/gatsby/issues"
+  "engines": {
+    "node": ">=20"
   }
 }
