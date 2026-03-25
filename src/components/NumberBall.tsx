@@ -7,11 +7,11 @@ type NumberBallProps = {
 function getBackgroundColorForNumber(number: string): string {
   const integer = Number(number)
 
-  if (integer >= 1 && integer <= 10) return '#f4cf77'
-  if (integer >= 11 && integer <= 20) return '#6aa7e8'
-  if (integer >= 21 && integer <= 30) return '#ff7666'
-  if (integer >= 31 && integer <= 40) return '#5a5e62'
-  return '#98e187'
+  if (integer >= 1 && integer <= 10) return '#c7aa58'
+  if (integer >= 11 && integer <= 20) return '#6484ad'
+  if (integer >= 21 && integer <= 30) return '#c46e5f'
+  if (integer >= 31 && integer <= 40) return '#666b73'
+  return '#7f9d65'
 }
 
 export default function NumberBall({ number }: NumberBallProps) {

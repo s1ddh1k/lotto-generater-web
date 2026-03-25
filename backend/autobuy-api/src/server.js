@@ -189,6 +189,12 @@ async function invokeWorkerDirect(taskPayload) {
       throw new Error(message)
     }
 
+    if (body?.ok === false) {
+      const message =
+        typeof body?.error === 'string' && body.error ? body.error : 'Worker rejected purchase request'
+      throw new Error(message)
+    }
+
     return body
   } finally {
     clearTimeout(timeout)

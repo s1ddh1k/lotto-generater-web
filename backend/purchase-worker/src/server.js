@@ -184,9 +184,23 @@ async function readVisibleAlert(frame) {
   })
 }
 
-function classifyPurchaseBlock(message) {
+function classifyPurchaseLayer(source, message) {
   const normalized = String(message || '').replace(/\s+/g, '')
   if (!normalized) return ''
+
+  if (source === 'recommend720Plus') {
+    return 'recommendation'
+  }
+
+  if (
+    normalized.includes('구매완료') ||
+    normalized.includes('구매가완료') ||
+    normalized.includes('정상적으로구매') ||
+    normalized.includes('정상적으로완료') ||
+    normalized.includes('구입완료')
+  ) {
+    return 'purchase-success'
+  }
 
   if (
     normalized.includes('구매한도') ||
@@ -207,7 +221,7 @@ function classifyPurchaseBlock(message) {
   return 'blocked'
 }
 
-async function readPurchaseBlocker(frame) {
+async function readPurchaseLayer(frame) {
   return frame.evaluate(() => {
     const visible = element => {
       if (!(element instanceof HTMLElement)) return false
@@ -241,6 +255,31 @@ async function readPurchaseBlocker(frame) {
 
     return { message: '', source: '' }
   })
+}
+
+async function resolvePurchaseLayer(frame, trace, phase) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const layer = await readPurchaseLayer(frame)
+    if (!layer.message) {
+      return { status: '', note: '', blockerSource: '' }
+    }
+
+    const status = classifyPurchaseLayer(layer.source, layer.message)
+    logStep(trace, `${phase}:layer:${status || 'unknown'}:${layer.source}:${layer.message}`)
+
+    if (status === 'recommendation') {
+      await sleep(250)
+      continue
+    }
+
+    return {
+      status,
+      note: layer.message,
+      blockerSource: layer.source
+    }
+  }
+
+  return { status: '', note: '', blockerSource: '' }
 }
 
 async function selectManualMode(frame) {
@@ -449,14 +488,20 @@ async function submitPurchase(frame, trace) {
 
   await sleep(900)
 
-  const blocker = await readPurchaseBlocker(frame)
-  if (blocker.message) {
-    const status = classifyPurchaseBlock(blocker.message)
-    logStep(trace, `buy:blocked:${status}:${blocker.source}:${blocker.message}`)
+  const buyLayer = await resolvePurchaseLayer(frame, trace, 'buy')
+  if (buyLayer.note) {
+    if (buyLayer.status === 'purchase-success') {
+      return {
+        status: 'purchase-submitted',
+        note: buyLayer.note,
+        blockerSource: buyLayer.blockerSource
+      }
+    }
+
     return {
-      status,
-      note: blocker.message,
-      blockerSource: blocker.source
+      status: buyLayer.status || 'blocked',
+      note: buyLayer.note,
+      blockerSource: buyLayer.blockerSource
     }
   }
 
@@ -495,14 +540,20 @@ async function submitPurchase(frame, trace) {
   }
 
   await sleep(1800)
-  const postConfirmBlocker = await readPurchaseBlocker(frame)
-  if (postConfirmBlocker.message) {
-    const status = classifyPurchaseBlock(postConfirmBlocker.message)
-    logStep(trace, `buy:post-confirm-blocked:${status}:${postConfirmBlocker.source}:${postConfirmBlocker.message}`)
+  const postConfirmLayer = await resolvePurchaseLayer(frame, trace, 'buy:post-confirm')
+  if (postConfirmLayer.note) {
+    if (postConfirmLayer.status === 'purchase-success') {
+      return {
+        status: 'purchase-submitted',
+        note: postConfirmLayer.note,
+        blockerSource: postConfirmLayer.blockerSource
+      }
+    }
+
     return {
-      status,
-      note: postConfirmBlocker.message,
-      blockerSource: postConfirmBlocker.source
+      status: postConfirmLayer.status || 'blocked',
+      note: postConfirmLayer.note,
+      blockerSource: postConfirmLayer.blockerSource
     }
   }
 
@@ -516,21 +567,31 @@ async function submitPurchase(frame, trace) {
 
 async function runDrySimulation(payload) {
   const now = new Date().toISOString()
+  const formattedGames = formatGames(payload.games)
 
   return {
     status: 'dry-run-complete',
     executedAt: now,
     drawNo: payload.drawNo,
     gameCount: payload.games.length,
-    games: formatGames(payload.games),
+    games: formattedGames,
+    submittedGames: formattedGames,
     note: 'No real purchase was executed. This only validates the end-to-end queue pipeline.'
   }
 }
 
 async function runRealPurchase(payload) {
+  const requestedGames = formatGames(payload.games)
+  const now = () => new Date().toISOString()
+
   if (!enableRealPurchase) {
     return {
       status: 'skipped',
+      executedAt: now(),
+      drawNo: payload.drawNo,
+      gameCount: payload.games.length,
+      games: requestedGames,
+      submittedGames: requestedGames,
       note: 'ENABLE_REAL_PURCHASE is false. Real purchase is blocked by safety guard.'
     }
   }
@@ -539,6 +600,11 @@ async function runRealPurchase(payload) {
     return {
       status: 'failed',
       retryRecommended: false,
+      executedAt: now(),
+      drawNo: payload.drawNo,
+      gameCount: payload.games.length,
+      games: requestedGames,
+      submittedGames: requestedGames,
       error: 'DHL_USER_ID or DHL_USER_PASSWORD is missing'
     }
   }
@@ -601,23 +667,28 @@ async function runRealPurchase(payload) {
       await addOneGame(frame, games[index], index, trace)
     }
 
+    const reportRowsBeforeSubmit = await readReportRows(frame)
     const submitResult = await submitPurchase(frame, trace)
-    const reportRows = await readReportRows(frame)
+    const reportRowsAfterSubmit = await readReportRows(frame)
     if (captureScreenshotEnabled) {
       screenshotPath = await captureScreenshot(page, payload.requestId, submitResult.status)
     }
 
     return {
       status: submitResult.status,
-      executedAt: new Date().toISOString(),
+      executedAt: now(),
       drawNo: payload.drawNo,
       gameCount: games.length,
       games: formatGames(games),
-      reportRows,
+      submittedGames: reportRowsBeforeSubmit.length > 0 ? reportRowsBeforeSubmit : formatGames(games),
+      reportRows: reportRowsAfterSubmit,
+      reportRowsBeforeSubmit,
+      reportRowsAfterSubmit,
       screenshotCaptured: Boolean(screenshotPath),
       confirmPurchase,
       trace,
-      note: submitResult.note
+      note: submitResult.note,
+      blockerSource: submitResult.blockerSource || ''
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown purchase worker error'
@@ -625,10 +696,11 @@ async function runRealPurchase(payload) {
     return {
       status: 'failed',
       retryRecommended: false,
-      executedAt: new Date().toISOString(),
+      executedAt: now(),
       drawNo: payload.drawNo,
       gameCount: payload.games.length,
-      games: formatGames(payload.games),
+      games: requestedGames,
+      submittedGames: requestedGames,
       error: message,
       screenshotCaptured: Boolean(screenshotPath),
       trace
