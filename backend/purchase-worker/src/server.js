@@ -23,6 +23,16 @@ const actionDelayMs = Number(process.env.BROWSER_ACTION_DELAY_MS || 120)
 const maxGameCount = Number(process.env.PURCHASE_MAX_GAMES || 5)
 const captureScreenshotEnabled = process.env.CAPTURE_SCREENSHOT === 'true'
 
+class PurchaseFlowError extends Error {
+  constructor(status, message, blockerSource = '') {
+    super(message)
+    this.name = 'PurchaseFlowError'
+    this.status = status
+    this.note = message
+    this.blockerSource = blockerSource
+  }
+}
+
 function sanitizeGames(games) {
   if (!Array.isArray(games)) return []
 
@@ -214,7 +224,12 @@ function classifyPurchaseLayer(source, message) {
     return 'insufficient-balance'
   }
 
-  if (normalized.includes('판매') && (normalized.includes('마감') || normalized.includes('종료') || normalized.includes('불가'))) {
+  if (
+    (normalized.includes('판매') &&
+      (normalized.includes('마감') || normalized.includes('종료') || normalized.includes('불가'))) ||
+    (normalized.includes('판매시간') && normalized.includes('아닙')) ||
+    (normalized.includes('구매시간') && normalized.includes('아닙'))
+  ) {
     return 'sale-closed'
   }
 
@@ -394,6 +409,11 @@ async function openGameFrame(page, trace) {
   const alertMessage = await readVisibleAlert(frame)
   if (alertMessage) {
     logStep(trace, `game:alert ${alertMessage}`)
+  }
+
+  const alertStatus = classifyPurchaseLayer('popupLayerAlert', alertMessage)
+  if (alertStatus && alertStatus !== 'recommendation' && alertStatus !== 'purchase-success') {
+    throw new PurchaseFlowError(alertStatus, alertMessage, 'popupLayerAlert')
   }
 
   if (alertMessage.includes('세션이 해제') || alertMessage.includes('로그인')) {
@@ -691,6 +711,22 @@ async function runRealPurchase(payload) {
       blockerSource: submitResult.blockerSource || ''
     }
   } catch (error) {
+    if (error instanceof PurchaseFlowError) {
+      return {
+        status: error.status,
+        retryRecommended: false,
+        executedAt: now(),
+        drawNo: payload.drawNo,
+        gameCount: payload.games.length,
+        games: requestedGames,
+        submittedGames: requestedGames,
+        note: error.note,
+        blockerSource: error.blockerSource,
+        screenshotCaptured: Boolean(screenshotPath),
+        trace
+      }
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown purchase worker error'
 
     return {
