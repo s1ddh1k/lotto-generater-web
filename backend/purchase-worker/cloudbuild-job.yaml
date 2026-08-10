@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.job
+      - -t
+      - asia-northeast3-docker.pkg.dev/lotto-autobuy/cloud-run-source-deploy/lotto-purchase-job:latest
+      - .
+images:
+  - asia-northeast3-docker.pkg.dev/lotto-autobuy/cloud-run-source-deploy/lotto-purchase-job:latest

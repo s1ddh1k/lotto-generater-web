@@ -1,0 +1,20 @@
+{
+  "scannedAt": "2026-08-10",
+  "framework": "Vite 7 + React 18 + TypeScript",
+  "fontStack": "IBM Plex Sans KR via Google Fonts",
+  "palette": "Existing green-led light interface with hard-coded hex values",
+  "motion": "motion-cut; no animation library installed",
+  "spacing": "No named spacing scale detected",
+  "preserve": [
+    "React component ownership",
+    "purchase and Google authentication behavior",
+    "IBM Plex Sans KR body typography"
+  ],
+  "introduce": [
+    "Split Studio macrostructure",
+    "Almanac theme tokens",
+    "4pt semantic spacing scale",
+    "complete interaction states",
+    "mobile verification at 320, 375, 414, and 768 pixels"
+  ]
+}

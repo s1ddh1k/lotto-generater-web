@@ -1,0 +1,72 @@
+:root {
+  --color-paper: oklch(99% 0.004 250);
+  --color-paper-2: oklch(97% 0.006 250);
+  --color-paper-3: oklch(94% 0.008 250);
+  --color-ink: oklch(19% 0.012 250);
+  --color-ink-2: oklch(31% 0.012 250);
+  --color-neutral: oklch(42% 0.01 250);
+  --color-muted: oklch(46% 0.009 250);
+  --color-rule: oklch(87% 0.007 250);
+  --color-rule-strong: oklch(62% 0.01 250);
+  --color-accent: oklch(55% 0.19 255);
+  --color-accent-ink: oklch(99% 0.004 250);
+  --color-focus: oklch(52% 0.22 255);
+  --color-error: oklch(48% 0.17 28);
+  --color-error-paper: oklch(96% 0.025 28);
+  --color-warning: oklch(43% 0.105 75);
+  --color-warning-paper: oklch(96% 0.028 75);
+  --color-info: oklch(45% 0.13 255);
+  --color-info-paper: oklch(96% 0.022 255);
+  --color-success: oklch(41% 0.11 150);
+  --color-success-paper: oklch(96% 0.022 150);
+  --color-ball-1: oklch(68% 0.11 85);
+  --color-ball-2: oklch(53% 0.1 245);
+  --color-ball-3: oklch(54% 0.13 28);
+  --color-ball-4: oklch(43% 0.015 250);
+  --color-ball-5: oklch(52% 0.09 145);
+  --color-ball-ink: oklch(99% 0.004 250);
+
+  --font-display: "Bricolage Grotesque", "IBM Plex Sans KR", sans-serif;
+  --font-body: "IBM Plex Sans KR", sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.953rem;
+  --text-2xl: 2.441rem;
+  --text-display: clamp(2.35rem, 7vw, 3.75rem);
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 190ms;
+  --dur-long: 360ms;
+
+  --rule-hairline: 1px;
+  --rule-strong: 2px;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+  --radius-media: 0.75rem;
+  --control-height: 3rem;
+  --page-width: 74rem;
+  --document-width: 46rem;
+  --measure: 60ch;
+  --shadow-panel: 0 1px 2px oklch(19% 0.012 250 / 0.05);
+  --z-base: 1;
+  --z-raised: 10;
+  --z-sticky: 200;
+}

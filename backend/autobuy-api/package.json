@@ -1,0 +1,19 @@
+{
+  "name": "lotto-autobuy-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Cloud Run backend skeleton for lotto auto-buy",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@google-cloud/tasks": "^6.2.1",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.15.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

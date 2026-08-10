@@ -1,0 +1,18 @@
+{
+  "name": "lotto-purchase-worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Cloud Run worker that executes purchase jobs from Cloud Tasks",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "puppeteer": "^24.37.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

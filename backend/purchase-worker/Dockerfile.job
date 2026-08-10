@@ -1,0 +1,8 @@
+FROM node:20-slim
+
+WORKDIR /workspace
+ENV NODE_ENV=production
+
+COPY src/http-purchase.js src/job.js ./src/
+
+CMD ["node", "src/job.js"]
