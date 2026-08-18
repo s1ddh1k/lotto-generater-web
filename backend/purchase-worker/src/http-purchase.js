@@ -104,6 +104,32 @@ function logStep(trace, message) {
   trace.push(`${new Date().toISOString()} ${message}`)
 }
 
+export function getLottoSaleWindow(date = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Seoul',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(date)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  )
+  const hour = Number(parts.hour)
+  const minute = Number(parts.minute)
+  const closeHour = parts.weekday === 'Sat' ? 20 : 24
+
+  return {
+    open: hour >= 6 && hour < closeHour,
+    weekday: parts.weekday,
+    minutesSinceMidnight: hour * 60 + minute,
+    opensAtHour: 6,
+    closesAtHour: closeHour
+  }
+}
+
 async function login(session, config, trace) {
   const portalOrigin = new URL(config.loginUrl).origin
   logStep(trace, `http-login:start ${config.loginUrl}`)
@@ -166,6 +192,15 @@ export async function runHttpPurchase(payload, config) {
   const gameOrigin = new URL(gameUrl).origin
 
   try {
+    const saleWindow = getLottoSaleWindow()
+    if (!saleWindow.open) {
+      throw new PurchaseHttpError(
+        'sale-closed',
+        '현재는 로또 인터넷 판매시간이 아닙니다. 일~금 06:00~24:00, 토요일 06:00~20:00에 구매할 수 있습니다.',
+        'sale-hours'
+      )
+    }
+
     await login(session, config, trace)
     logStep(trace, `http-game:start ${gameUrl}`)
     const gameResponse = await session.request(gameUrl, {

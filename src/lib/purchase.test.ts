@@ -108,6 +108,26 @@ describe('derivePurchaseRecord', () => {
     expect(record.statusLabel).toBe('확인 필요')
     expect(record.title).toBe('구매 결과 확인 필요')
   })
+
+  it('shows a sale-closed worker result as a sale-hours error', () => {
+    const record = derivePurchaseRecord({
+      ok: true,
+      worker: {
+        ok: true,
+        result: {
+          status: 'sale-closed',
+          note: '현재는 로또 인터넷 판매시간이 아닙니다.',
+          blockerSource: 'sale-hours'
+        }
+      }
+    })
+
+    expect(record.tone).toBe('error')
+    expect(record.statusCode).toBe('sale-closed')
+    expect(record.title).toBe('판매 종료')
+    expect(record.statusLabel).toBe('판매 종료')
+    expect(record.blockerSource).toBe('sale-hours')
+  })
 })
 
 describe('createPurchaseErrorRecord', () => {
