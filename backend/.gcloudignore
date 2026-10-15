@@ -1,0 +1,8 @@
+.gcloudignore
+**/node_modules/**
+**/__pycache__/**
+**/.env*
+**/*.log
+**/*.test.js
+**/README.md
+purchase-worker/**

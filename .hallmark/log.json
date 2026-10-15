@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-10-16",
+    "macrostructure": "Component Playground",
+    "theme": "Plain (existing blue tokens)",
+    "nav": "N9",
+    "footer": "Ft2",
+    "enrichment": "none",
+    "brief": "Single ticket: header login dialog, random numbers after login, mobile five-game purchase"
+  },
+  {
     "date": "2026-08-10",
     "macrostructure": "Workbench",
     "theme": "custom",

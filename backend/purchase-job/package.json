@@ -1,0 +1,9 @@
+{
+  "name": "lotto-purchase-job",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "One-shot HTTP purchase job for Cloud Run",
+  "scripts": { "start": "node src/job.js", "self-test": "node src/job.js --self-test" },
+  "engines": { "node": ">=24 <25" }
+}

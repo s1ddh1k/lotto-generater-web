@@ -1,0 +1,6 @@
+node_modules
+*.log
+.env*
+.git
+README.md
+src/*.test.js

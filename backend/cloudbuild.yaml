@@ -1,0 +1,17 @@
+steps:
+  - id: purchase-job
+    name: gcr.io/cloud-builders/docker
+    args: [build, --pull, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/lotto-purchase-job:${_TAG}', purchase-job]
+    waitFor: ['-']
+  - id: purchase-api
+    name: gcr.io/cloud-builders/docker
+    args: [build, --pull, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/lotto-autobuy-api:${_TAG}', autobuy-api]
+    waitFor: ['-']
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/lotto-purchase-job:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/lotto-autobuy-api:${_TAG}'
+options:
+  workerRelease: regular
+substitutions:
+  _REGION: asia-northeast3
+  _TAG: node24

@@ -3,7 +3,7 @@ command = "npm run build"
 publish = "dist"
 
 [build.environment]
-NODE_VERSION = "22"
+NODE_VERSION = "24"
 VITE_ENABLE_AUTOBUY = "true"
 VITE_GOOGLE_CLIENT_ID = "188930096339-2th3923rdb7ovtr42ojtsjtubmfmd4ns.apps.googleusercontent.com"
 VITE_AUTOBUY_API_BASE = "https://lotto-autobuy-api-n6eykdwlhq-du.a.run.app"

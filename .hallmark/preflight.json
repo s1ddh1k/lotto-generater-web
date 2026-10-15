@@ -1,20 +1,24 @@
 {
-  "scannedAt": "2026-08-10",
+  "scannedAt": "2026-10-16",
   "framework": "Vite 7 + React 18 + TypeScript",
-  "fontStack": "IBM Plex Sans KR via Google Fonts",
-  "palette": "Existing green-led light interface with hard-coded hex values",
-  "motion": "motion-cut; no animation library installed",
-  "spacing": "No named spacing scale detected",
+  "fontStack": {
+    "display": "Bricolage Grotesque",
+    "body": "IBM Plex Sans KR",
+    "source": "tokens.css"
+  },
+  "palette": "Shared OKLCH tokens: white and cool grey surfaces, blue action, pastel lotto number ranges (tokens.css)",
+  "motion": "CSS number reveal and button feedback; no animation library; reduced motion supported",
+  "spacing": "Named spacing scale in tokens.css",
   "preserve": [
     "React component ownership",
-    "purchase and Google authentication behavior",
-    "IBM Plex Sans KR body typography"
+    "Google Identity Services authentication",
+    "Existing purchase API and five identical games for 5,000 KRW",
+    "Existing font families and blue accent"
   ],
   "introduce": [
-    "Split Studio macrostructure",
-    "Almanac theme tokens",
-    "4pt semantic spacing scale",
-    "complete interaction states",
-    "mobile verification at 320, 375, 414, and 768 pixels"
+    "Single-ticket purchase interface",
+    "Header login dialog",
+    "Placeholder numbers until login",
+    "Mobile and keyboard verification"
   ]
 }

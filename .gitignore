@@ -69,3 +69,11 @@ yarn-error.log
 
 # Local Netlify folder
 .netlify
+
+# Browser verification artifacts
+playwright-report/
+test-results/
+
+# Python deployment helpers
+__pycache__/
+*.pyc

@@ -1,448 +1,231 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Scanner } from "@yudiel/react-qr-scanner"
-import GameRow from "./components/GameRow"
-import {
-  generateGames,
-  isSupportedLottoUrl,
-  parseNumbersFromUrl,
-} from "./lib/lotto"
-import {
-  createPurchaseErrorRecord,
-  derivePurchaseRecord,
-  type PurchaseApiResponse,
-  type PurchaseRecord,
-} from "./lib/purchase"
+import { useCallback, useRef, useState } from 'react'
+import GameRow from './components/GameRow'
+import LoginDialog from './components/LoginDialog'
+import { generateOneGame } from './lib/lotto'
+import { derivePurchaseRecord, type PurchaseApiResponse, type PurchaseRecord } from './lib/purchase'
 
-type GoogleCredentialResponse = { credential?: string }
+const gameCount = 5
+const purchaseEnabled = import.meta.env.VITE_ENABLE_AUTOBUY === 'true'
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+const purchaseApiBase = (import.meta.env.VITE_AUTOBUY_API_BASE || '/autobuy').replace(/\/$/, '')
 
-type GoogleIdClient = {
-  initialize: (options: {
-    client_id: string
-    callback: (response: GoogleCredentialResponse) => void
-  }) => void
-  renderButton: (element: HTMLElement, options: Record<string, unknown>) => void
-  disableAutoSelect: () => void
+function ArrowIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
 }
 
-declare global {
-  interface Window {
-    google?: { accounts?: { id?: GoogleIdClient } }
-  }
-}
-
-const purchaseStorageKey = "lotto-last-purchase"
-
-function formatDateTime(value: string): string {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
-function readStoredPurchaseRecord(): PurchaseRecord | null {
-  try {
-    const raw = window.localStorage.getItem(purchaseStorageKey)
-    return raw ? (JSON.parse(raw) as PurchaseRecord) : null
-  } catch {
-    return null
+function purchaseMessage(record: PurchaseRecord): string {
+  switch (record.statusCode) {
+    case 'purchase-submitted': return '선택한 번호로 5게임을 구매했어요. 동행복권에서 구매 내역을 확인할 수 있어요.'
+    case 'queued': return '구매 요청을 접수했어요. 추가 구매 전에 동행복권에서 내역을 확인해 주세요.'
+    case 'insufficient-balance': return '동행복권 예치금이 부족해요. 충전한 뒤 다시 시도해 주세요.'
+    case 'limit-exceeded': return '이번 주 구매 한도를 초과했어요. 동행복권에서 구매 내역을 확인해 주세요.'
+    case 'sale-closed': return '현재는 구매할 수 없는 시간이에요. 판매 시간에 다시 시도해 주세요.'
+    case 'ready-for-final-confirm':
+    case 'skipped': return '현재 구매 연결을 확인 중이에요. 실제 구매는 진행되지 않았어요.'
+    case 'dry-run-complete': return '구매 연결을 확인했어요. 실제 구매는 진행되지 않았어요.'
+    case 'blocked': return '구매를 진행할 수 없어요. 동행복권에서 계정 상태를 확인해 주세요.'
+    case 'failed': return '구매를 완료하지 못했어요. 동행복권에서 내역을 확인한 뒤 다시 시도해 주세요.'
+    default: return '구매 결과를 확인하지 못했어요. 중복 구매를 피하려면 동행복권 구매 내역을 먼저 확인해 주세요.'
   }
 }
 
 export default function App() {
-  const [showQrTools, setShowQrTools] = useState(false)
-  const [showScanner, setShowScanner] = useState(false)
-  const [manualUrl, setManualUrl] = useState("")
-  const [excludedNumbers, setExcludedNumbers] = useState<string[]>([])
-  const [generatedGames, setGeneratedGames] = useState<string[][]>(() =>
-    generateGames([], 1)
-  )
-  const [errorMessage, setErrorMessage] = useState("")
+  const [token, setToken] = useState('')
+  const [numbers, setNumbers] = useState<string[]>([])
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [authMessage, setAuthMessage] = useState('')
   const [purchaseLoading, setPurchaseLoading] = useState(false)
-  const [googleIdToken, setGoogleIdToken] = useState("")
-  const [googleAuthStatus, setGoogleAuthStatus] = useState("")
-  const [latestPurchase, setLatestPurchase] = useState<PurchaseRecord | null>(null)
-  const googleButtonRef = useRef<HTMLDivElement | null>(null)
+  const [result, setResult] = useState<PurchaseRecord | null>(null)
+  const [purchaseLocked, setPurchaseLocked] = useState(false)
+  const purchaseInFlight = useRef(false)
 
-  const autobuyEnabled = import.meta.env.VITE_ENABLE_AUTOBUY === "true"
-  const autobuyApiBase = import.meta.env.VITE_AUTOBUY_API_BASE || "/autobuy"
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ""
-  const generatedGame = generatedGames[0] || []
-  const repeatedGames = useMemo(
-    () =>
-      generatedGame.length === 6
-        ? Array.from({ length: 5 }, () => [...generatedGame])
-        : [],
-    [generatedGame]
-  )
-  const canBuy = repeatedGames.length === 5 && Boolean(googleIdToken)
-  const showGoogleButton = Boolean(googleClientId) && !googleIdToken
-
-  const commitPurchaseRecord = (record: PurchaseRecord) => {
-    setLatestPurchase(record)
-    try {
-      window.localStorage.setItem(purchaseStorageKey, JSON.stringify(record))
-    } catch {
-      // The current result still remains visible when storage is unavailable.
-    }
-  }
-
-  useEffect(() => {
-    setLatestPurchase(readStoredPurchaseRecord())
+  const handleSignIn = useCallback((credential: string) => {
+    setToken(credential)
+    setAuthMessage('')
+    setNumbers(current => current.length === 6 ? current : generateOneGame())
+    setLoginOpen(false)
   }, [])
 
-  useEffect(() => {
-    if (!autobuyEnabled) return
-    if (!googleClientId) {
-      setGoogleAuthStatus("Google 로그인 설정이 없습니다.")
-      return
-    }
-    if (!showGoogleButton) return
-
-    const initializeGoogleButton = () => {
-      const googleId = window.google?.accounts?.id
-      const button = googleButtonRef.current
-      if (!googleId || !button) return
-
-      googleId.initialize({
-        client_id: googleClientId,
-        callback: (response) => {
-          const token = response.credential || ""
-          if (!token) {
-            setGoogleAuthStatus("Google 로그인에 실패했습니다. 다시 시도해 주세요.")
-            return
-          }
-          setGoogleIdToken(token)
-          setGoogleAuthStatus("")
-        },
-      })
-      button.innerHTML = ""
-      googleId.renderButton(button, {
-        type: "icon",
-        theme: "outline",
-        size: "large",
-        shape: "circle",
-        locale: "ko",
-      })
-    }
-
-    if (window.google?.accounts?.id) {
-      initializeGoogleButton()
-      return
-    }
-
-    const scriptId = "google-gsi-script"
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null
-    if (existing) {
-      existing.addEventListener("load", initializeGoogleButton, { once: true })
-      return () => existing.removeEventListener("load", initializeGoogleButton)
-    }
-
-    const script = document.createElement("script")
-    script.id = scriptId
-    script.src = "https://accounts.google.com/gsi/client"
-    script.async = true
-    script.defer = true
-    script.onload = initializeGoogleButton
-    script.onerror = () =>
-      setGoogleAuthStatus("Google 로그인을 불러오지 못했습니다.")
-    document.head.appendChild(script)
-  }, [autobuyEnabled, googleClientId, showGoogleButton])
-
-  const createNewNumber = (excluded: string[] = excludedNumbers) => {
-    try {
-      setGeneratedGames(generateGames(excluded, 1))
-      setErrorMessage("")
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "번호를 만들지 못했습니다."
-      )
-    }
-  }
-
-  const applyLottoUrl = (value: string) => {
-    const url = value.trim()
-    if (!url) return
-    if (!isSupportedLottoUrl(url)) {
-      setErrorMessage("동행복권 QR 주소만 사용할 수 있습니다.")
-      return
-    }
-
-    const numbers = parseNumbersFromUrl(url)
-    if (numbers.length === 0) {
-      setErrorMessage("QR 주소에서 번호를 찾지 못했습니다.")
-      return
-    }
-
-    setManualUrl(url)
-    setExcludedNumbers(numbers)
-    createNewNumber(numbers)
-    setShowScanner(false)
-    setShowQrTools(false)
-  }
-
-  const logoutGoogle = () => {
+  const logout = () => {
+    if (purchaseInFlight.current) return
     window.google?.accounts?.id?.disableAutoSelect()
-    setGoogleIdToken("")
-    setGoogleAuthStatus("")
+    setToken('')
+    setNumbers([])
+    setResult(null)
+    setPurchaseLocked(false)
+    setAuthMessage('')
+  }
+
+  const regenerate = () => {
+    if (!token || purchaseInFlight.current) return
+    setNumbers(generateOneGame())
+    setPurchaseLocked(false)
   }
 
   const submitPurchase = async () => {
-    if (!canBuy || purchaseLoading) return
+    if (!token || !purchaseEnabled || numbers.length !== 6 || purchaseInFlight.current || purchaseLocked) return
 
-    const requestedAt = new Date().toISOString()
+    purchaseInFlight.current = true
     setPurchaseLoading(true)
-    setErrorMessage("")
+    setResult(null)
+    const games = Array.from({ length: gameCount }, () => [...numbers])
+    const options = { requestedAt: new Date().toISOString(), fallbackGames: games }
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 260_000)
 
     try {
-      const response = await fetch(`${autobuyApiBase}/purchase`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${googleIdToken}`,
-        },
-        body: JSON.stringify({
-          dryRun: false,
-          games: repeatedGames.map((game) => game.map(Number)),
-        }),
+      const response = await fetch(`${purchaseApiBase}/purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dryRun: false, games: games.map(game => game.map(Number)) }),
+        signal: controller.signal,
       })
       const rawBody = await response.text()
-      let data: PurchaseApiResponse
-
+      let data: PurchaseApiResponse = {}
       try {
-        data = rawBody ? (JSON.parse(rawBody) as PurchaseApiResponse) : {}
-      } catch {
-        data = {
-          ok: false,
-          error: `서버 응답을 읽지 못했습니다. (HTTP ${response.status})`,
+        const parsed: unknown = JSON.parse(rawBody)
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          data = parsed as PurchaseApiResponse
         }
+      } catch {
+        // An unreadable response cannot establish whether the purchase went through.
+      }
+
+      if (response.status === 401) {
+        setToken('')
+        setAuthMessage('로그인 시간이 만료됐어요. 다시 로그인해 주세요.')
+        setLoginOpen(true)
+        return
+      }
+
+      if (response.status >= 500) {
+        setResult(derivePurchaseRecord({ status: 'verification-needed' }, options))
+        setPurchaseLocked(true)
+        return
       }
 
       if (!response.ok) {
-        data = {
-          ...data,
-          ok: false,
-          status: "failed",
-          error:
-            data.error ||
-            `구매 요청에 실패했습니다. (HTTP ${response.status})`,
+        data = { ...data, ok: false, status: 'failed' }
+        if (response.status === 403) {
+          setAuthMessage('이 계정은 구매 권한이 없어요. 허용된 Google 계정으로 로그인해 주세요.')
+          setToken('')
+          setLoginOpen(true)
+          return
         }
       }
 
-      const record = derivePurchaseRecord(data, {
-        requestedAt,
-        fallbackGames: repeatedGames,
-      })
-      commitPurchaseRecord(record)
-      if (response.status === 401) {
-        setGoogleIdToken("")
-        setGoogleAuthStatus("로그인 시간이 만료됐습니다. 다시 로그인해 주세요.")
-      }
-      if (!response.ok && !record.error) {
-        setErrorMessage(`구매 요청에 실패했습니다. (HTTP ${response.status})`)
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "구매 서버에 연결하지 못했습니다."
-      commitPurchaseRecord(
-        createPurchaseErrorRecord(message, {
-          requestedAt,
-          fallbackGames: repeatedGames,
-        })
-      )
+      const record = derivePurchaseRecord(data, options)
+      setResult(record)
+      setPurchaseLocked(record.tone !== 'error')
+    } catch {
+      setResult(derivePurchaseRecord({ status: 'verification-needed' }, options))
+      setPurchaseLocked(true)
     } finally {
+      window.clearTimeout(timeout)
+      purchaseInFlight.current = false
       setPurchaseLoading(false)
     }
   }
 
   return (
-    <main className="app-shell">
-      <div className="app-frame">
-        <header className="nav-min" aria-label="서비스와 로그인 상태">
-          <span className="wordmark" aria-label="로또 6/45">6/45</span>
-          {googleIdToken ? (
-            <div className="account-actions">
-              <span className="account-state">Gmail 로그인됨</span>
-              <button className="nav-action" type="button" onClick={logoutGoogle}>로그아웃</button>
-            </div>
-          ) : <span className="account-state">로그인 전</span>}
+    <div className="app-shell">
+      <header className="site-header" aria-label="서비스와 계정">
+        <a className="brand" href="/" aria-label="로또 6/45 홈">
+          <span className="brand-symbol" aria-hidden="true"><span /><span /><span /><span /></span>
+          <span className="wordmark">6/45<span className="brand-dot">.</span></span>
+        </a>
+        {token ? (
+          <div className="account-actions">
+            <span className="account-state"><span aria-hidden="true" />로그인됨</span>
+            <button className="header-action" type="button" onClick={logout} disabled={purchaseLoading}>로그아웃</button>
+          </div>
+        ) : (
+          <button className="header-action" type="button" onClick={() => setLoginOpen(true)} aria-haspopup="dialog">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="6.5" r="3" /><path d="M4 17v-1a6 6 0 0 1 12 0v1" /></svg>
+            로그인
+          </button>
+        )}
+      </header>
+
+      <main className="main-content">
+        <header className="page-intro">
+          <h1>번호 뽑고, <span>바로 구매.</span></h1>
+          <p>고민은 줄이고, 행운은 가볍게.<br />랜덤 번호로 모바일에서도 간편하게.</p>
         </header>
 
-        <div className="workbench-shell">
-          <section className="purchase-document" aria-labelledby="purchase-title">
-            <header className="document-intro">
-              <h1 id="purchase-title">로또 자동구매</h1>
-              <p>번호를 확인하고 같은 조합으로 5게임을 구매합니다.</p>
-            </header>
+        <section className="lotto-ticket" aria-labelledby="ticket-title">
+          <div className="ticket-heading">
+            <h2 id="ticket-title">나의 행운 번호</h2>
+            <span className="ticket-type">로또 6/45</span>
+          </div>
 
-            <dl className="purchase-spec" aria-label="구매 조건">
-              <div><dt>게임</dt><dd>5게임</dd></div>
-              <div><dt>금액</dt><dd>5,000원</dd></div>
-              <div><dt>방식</dt><dd>동일 번호</dd></div>
-            </dl>
+          <div className={`number-stage${token ? '' : ' number-stage-empty'}`}>
+            <div className="number-display" role="status" aria-label="생성한 로또 번호">
+              {token && numbers.length === 6 ? (
+                <GameRow key={numbers.join('-')} numbers={numbers} />
+              ) : (
+                <div className="number-placeholders" aria-label="로그인 후 번호가 생성됩니다">
+                  {Array.from({ length: 6 }, (_, index) => <span className="number-placeholder" key={index} aria-hidden="true">?</span>)}
+                </div>
+              )}
+            </div>
+            {token ? (
+              <button className="regenerate-button" type="button" onClick={regenerate} disabled={purchaseLoading}>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16.5 8A6.7 6.7 0 1 0 17 12M16.5 3.5V8H12" /></svg>
+                다시 뽑기
+              </button>
+            ) : <p className="number-hint">로그인하면 행운 번호를 뽑아드려요.</p>}
+          </div>
 
-            <section className="number-pane" aria-labelledby="number-title">
-            <header className="number-head">
-              <h2 id="number-title">구매할 번호</h2>
-              {excludedNumbers.length > 0 ? (
-                <span className="filter-note">제외 {excludedNumbers.length}개</span>
-              ) : <span className="filter-note">제외 번호 없음</span>}
-            </header>
-
-            <div className="hero-numbers" aria-live="polite">
-              <GameRow numbers={generatedGame} />
+          <div className="ticket-checkout">
+            <div className="order-summary">
+              <div><span className="order-label">동일 번호 5게임</span><span className="order-description">1게임 1,000원</span></div>
+              <strong className="order-total">5,000<span>원</span></strong>
             </div>
 
-            <div className="main-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => createNewNumber()}>
-                번호 다시 뽑기
-              </button>
+            {token ? (
               <button
-                className="btn btn-quiet"
+                className="primary-button"
                 type="button"
-                aria-expanded={showQrTools}
-                onClick={() => setShowQrTools((shown) => !shown)}
+                onClick={submitPurchase}
+                disabled={!purchaseEnabled || purchaseLoading || purchaseLocked}
+                aria-busy={purchaseLoading}
+                data-state={purchaseLoading ? 'loading' : purchaseLocked ? result?.tone === 'success' ? 'success' : 'pending' : 'default'}
               >
-                제외 번호 설정
+                {purchaseLoading ? <><span className="spinner" aria-hidden="true" />구매 요청 확인 중</>
+                  : purchaseLocked ? <>{result?.statusCode === 'purchase-submitted' ? '구매 완료' : '구매 내역을 확인해 주세요'}{result?.tone === 'success' ? <span aria-hidden="true">✓</span> : <ArrowIcon />}</>
+                  : <>5,000원 구매하기<ArrowIcon /></>}
               </button>
+            ) : (
+              <button className="primary-button" type="button" onClick={() => setLoginOpen(true)} aria-haspopup="dialog">
+                로그인하고 번호 뽑기<ArrowIcon />
+              </button>
+            )}
+            <p className="checkout-note" role="status">
+              {purchaseLoading ? '결과를 확인하고 있어요. 잠시만 기다려 주세요.'
+                : token && !purchaseEnabled ? '현재 구매 기능을 사용할 수 없어요.'
+                : purchaseLocked ? '새 번호를 뽑으면 다시 구매할 수 있어요.'
+                : '선택한 번호로 동일한 5게임을 구매해요.'}
+            </p>
+          </div>
+        </section>
+
+        {token && result ? (
+          <section className={`purchase-result result-${result.tone}`} role="status" aria-labelledby="result-title">
+            <div className="result-heading">
+              <span className="result-icon" aria-hidden="true">{result.tone === 'success' ? '✓' : result.tone === 'error' ? '!' : 'i'}</span>
+              <h2 id="result-title">{result.title}</h2>
             </div>
-
-            {showQrTools ? (
-              <div className="qr-tools">
-                <form
-                  className="url-form"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    applyLottoUrl(manualUrl)
-                  }}
-                >
-                  <label htmlFor="lotto-qr-url">동행복권 QR 주소</label>
-                  <div className="input-row">
-                    <input
-                      id="lotto-qr-url"
-                      value={manualUrl}
-                      onChange={(event) => setManualUrl(event.target.value)}
-                      placeholder="https://m.dhlottery.co.kr/…"
-                      aria-describedby={
-                        errorMessage === "동행복권 QR 주소만 사용할 수 있습니다."
-                          ? "lotto-qr-help purchase-error"
-                          : "lotto-qr-help"
-                      }
-                      aria-invalid={
-                        errorMessage === "동행복권 QR 주소만 사용할 수 있습니다."
-                      }
-                    />
-                    <button className="btn btn-secondary" type="submit">적용</button>
-                  </div>
-                  <p id="lotto-qr-help" className="field-help">이전에 구매한 QR 번호를 이번 추첨에서 제외합니다.</p>
-                </form>
-                <button
-                  className="text-button"
-                  type="button"
-                  onClick={() => setShowScanner((shown) => !shown)}
-                >
-                  {showScanner ? "카메라 닫기" : "카메라로 스캔"}
-                </button>
-                {showScanner ? (
-                  <div className="scanner-wrap">
-                    <Scanner
-                      formats={["qr_code"]}
-                      constraints={{ facingMode: "environment" }}
-                      onScan={(codes) => {
-                        const value = codes[0]?.rawValue
-                        if (value) applyLottoUrl(value)
-                      }}
-                      onError={(error) =>
-                        setErrorMessage(
-                          error instanceof Error ? error.message : "카메라를 사용할 수 없습니다."
-                        )
-                      }
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {errorMessage ? <p id="purchase-error" className="inline-error" role="alert">{errorMessage}</p> : null}
-
-            {autobuyEnabled ? (
-              <div className="buy-area">
-                {!googleIdToken ? (
-                  <div className="signin-row">
-                    <div>
-                      <strong>Gmail로 로그인</strong>
-                      <p>로그인한 계정 주소는 화면에 표시하지 않습니다.</p>
-                    </div>
-                    {showGoogleButton ? <div ref={googleButtonRef} /> : null}
-                    {googleAuthStatus ? <p className="inline-error">{googleAuthStatus}</p> : null}
-                  </div>
-                ) : null}
-                <button
-                  className="btn btn-buy"
-                  type="button"
-                  data-state={purchaseLoading ? "loading" : "default"}
-                  aria-busy={purchaseLoading}
-                  disabled={!canBuy || purchaseLoading}
-                  onClick={submitPurchase}
-                >
-                  {purchaseLoading ? "구매 요청 확인 중…" : "5,000원 구매"}
-                </button>
-                <p className="buy-note">
-                  {!googleIdToken
-                    ? "로그인하면 구매 버튼이 활성화됩니다."
-                    : purchaseLoading
-                      ? "동행복권의 최종 결과를 기다리고 있습니다."
-                      : "동일 번호 5게임을 동행복권에 전송합니다."}
-                </p>
-              </div>
-            ) : null}
-            </section>
+            <p>{purchaseMessage(result)}</p>
+            {result.submittedGames[0] ? <div className="result-numbers"><span>요청한 번호</span><GameRow numbers={result.submittedGames[0]} /></div> : null}
+            <a className="result-link" href="https://www.dhlottery.co.kr" target="_blank" rel="noreferrer">동행복권에서 확인<ArrowIcon /></a>
           </section>
+        ) : null}
 
-          {autobuyEnabled && latestPurchase ? (
-            <section className={`result-panel result-${latestPurchase.tone}`} aria-live="polite">
-              <div className="result-summary">
-                <div>
-                  <h2>{latestPurchase.title}</h2>
-                  <p className="result-message">{latestPurchase.message}</p>
-                </div>
-                <span className="result-badge">{latestPurchase.statusLabel}</span>
-              </div>
-              {latestPurchase.submittedGames[0] ? (
-                <div className="result-number">
-                  <GameRow numbers={latestPurchase.submittedGames[0]} />
-                  <span>{latestPurchase.submittedGames.length}게임</span>
-                </div>
-              ) : null}
-              <div className="result-actions">
-                {latestPurchase.link ? (
-                  <a className="text-link" href={latestPurchase.link} target="_blank" rel="noreferrer">
-                    동행복권 구매 내역 확인
-                  </a>
-                ) : null}
-                <details className="result-details">
-                  <summary>상세 정보</summary>
-                  <dl>
-                    <div><dt>요청 시각</dt><dd>{formatDateTime(latestPurchase.requestedAt)}</dd></div>
-                    <div><dt>실행 시각</dt><dd>{formatDateTime(latestPurchase.executedAt)}</dd></div>
-                    <div><dt>요청 ID</dt><dd>{latestPurchase.requestId || "-"}</dd></div>
-                  </dl>
-                  {latestPurchase.trace.length > 0 ? (
-                    <pre>{latestPurchase.trace.join("\n")}</pre>
-                  ) : null}
-                </details>
-              </div>
-            </section>
-          ) : null}
+        <footer className="page-footer"><span>6/45</span><span>오늘의 선택에, 작은 행운을.</span></footer>
+      </main>
 
-          <footer className="foot-mast">
-            <span className="wordmark">6/45</span>
-            <p>번호를 확인하고 구매하세요.</p>
-          </footer>
-        </div>
-      </div>
-    </main>
+      {loginOpen ? <LoginDialog clientId={googleClientId} message={authMessage} onSignIn={handleSignIn} onClose={() => setLoginOpen(false)} /> : null}
+    </div>
   )
 }
